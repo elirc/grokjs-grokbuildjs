@@ -6,6 +6,28 @@
 
 This document outlines proposed new features and a detailed, step-by-step implementation plan. Each feature includes learning objectives, technical approach, potential pitfalls, and why it matters for a junior engineer's growth.
 
+> **Status 2026-10-06:** Nothing in sections 1–5 is implemented. The baseline is one `Task` model, five routes in `backend/src/routes/tasks.ts`, and one page. It does not start as committed (see README, "Before You Try to Run It"). Do section 0 first.
+
+---
+
+## 0. Make the Baseline Run and Behave (do this first)
+
+**0.1 Make the backend start.**
+Goal: add `cors` and `@types/cors` to `backend/package.json`. Create `backend/.env.example` with `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/grokbuildjs` (copy it to `.env`), then run the first migration.
+**Check:** `docker compose up -d`, `npx prisma migrate dev --name init` and `npm run dev` all succeed, and `curl http://localhost:5000/health` returns `{"status":"ok",...}`.
+
+**0.2 Fix "Complete".**
+Goal: the `PUT /:id` handler parses with `createTaskSchema`, which requires `title` and has no `completed` key. The frontend sends `{ completed: true }`, so it gets a 400. Even a body with a title would lose `completed`, because Zod strips unknown keys. Add `completed: z.boolean().optional()` to the update schema and parse with `updateTaskSchema`.
+**Check:** `curl -X PUT -H "Content-Type: application/json" -d '{"completed":true}' localhost:5000/api/tasks/1` returns 200 with `"completed":true`, and the title is unchanged.
+
+**0.3 Stop reporting every failure as "not found".**
+Goal: `updateTask` and `deleteTask` in `taskService.ts` catch every error and return `null`/`false`, which the routes turn into 404. Catch only Prisma's "record not found" error (`P2025`) and rethrow everything else. Also return 400 when `parseInt(req.params.id)` is `NaN`.
+**Check:** `DELETE /api/tasks/abc` returns 400. `DELETE /api/tasks/999999` returns 404. With Postgres stopped, `DELETE /api/tasks/1` returns 500, not 404.
+
+**0.4 Make the frontend boot.**
+Goal: add `frontend/index.html` (with `<div id="root">` and a module script for `/src/main.tsx`), `vite.config.ts` with `@vitejs/plugin-react`, and a `tsconfig.json` (`npm run build` runs `tsc` first, and `tsc` with no config just prints help and fails). Then add `src/index.css` with the three `@tailwind` directives, plus `tailwind.config.js` and `postcss.config.js`.
+**Check:** `npm run build` in `frontend/` exits 0, and `npm run dev` shows the task list loaded from the backend.
+
 ---
 
 ## 1. User Authentication & Authorization (JWT + Role-based)
